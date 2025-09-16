@@ -1,7 +1,6 @@
 {
   "name": "property-scraper",
   "version": "1.0.0",
-  "main": "index.js",
   "type": "module",
   "scripts": {
     "dev": "vercel dev"
@@ -10,4 +9,3 @@
     "playwright": "^1.47.2"
   }
 }
-
