@@ -7,6 +7,6 @@
     "playwright-aws-lambda": "^0.10.0"
   },
   "engines": {
-    "node": "18.x"
+    "node": "22.x"
   }
 }
