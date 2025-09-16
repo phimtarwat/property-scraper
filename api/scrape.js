@@ -1,15 +1,19 @@
-import { chromium } from "playwright";
+import chromium from "playwright-aws-lambda";
 
 export default async function handler(req, res) {
   const { source = "ddproperty", location = "อโศก", bedrooms = 2, budget_max = 6000000 } = req.query;
 
-  const browser = await chromium.launch({ args: ["--no-sandbox"], headless: true });
+  const browser = await chromium.puppeteer.launch({
+    args: chromium.args,
+    executablePath: await chromium.executablePath,
+    headless: true
+  });
+
   const page = await browser.newPage();
 
-  let url = "";
   if (source === "ddproperty") {
-    url = `https://www.ddproperty.com/th/for-sale/condo?bedrooms=${bedrooms}&maxprice=${budget_max}&keyword=${encodeURIComponent(location)}`;
-    await page.goto(url, { waitUntil: "domcontentloaded" });
+    const url = `https://www.ddproperty.com/th/for-sale/condo?bedrooms=${bedrooms}&maxprice=${budget_max}&keyword=${encodeURIComponent(location)}`;
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
 
     const listings = await page.$$eval('a[data-testid="listing-card-link"]', nodes =>
       nodes.slice(0, 5).map(node => {
