@@ -5,7 +5,8 @@ export default async function handler(req, res) {
     source = "ddproperty",
     location = "อโศก",
     bedrooms = 2,
-    budget_max = 6000000
+    budget_max = 6000000,
+    limit = 20,
   } = req.query;
 
   let browser;
@@ -17,31 +18,49 @@ export default async function handler(req, res) {
     });
 
     const page = await browser.newPage();
-    let url = "";
     let listings = [];
 
     // -------------------------------
     // Source: DDproperty
     // -------------------------------
     if (source === "ddproperty") {
-      url = `https://www.ddproperty.com/th/for-sale/condo?bedrooms=${bedrooms}&maxprice=${budget_max}&keyword=${encodeURIComponent(location)}`;
+      let url = `https://www.ddproperty.com/รวมประกาศขาย?bedrooms=${bedrooms}&maxprice=${budget_max}&keyword=${encodeURIComponent(
+        location
+      )}`;
       await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
 
-      try {
-        listings = await page.$$eval('a[data-testid="listing-card-link"]', (nodes) =>
-          nodes.slice(0, 5).map((node) => {
-            const title = node.innerText?.trim() || "No title";
-            const link = node.href || "";
-            const card = node.closest('[data-testid="listing-card"]');
+      while (listings.length < limit) {
+        await page.waitForSelector('[data-testid="listing-card"]', { timeout: 10000 }).catch(() => null);
+
+        const pageListings = await page.$$eval('[data-testid="listing-card"]', (cards) =>
+          cards.map((card) => {
+            const title =
+              card.querySelector('a[data-testid="listing-card-link"]')?.innerText?.trim() || "No title";
+            const link = card.querySelector('a[data-testid="listing-card-link"]')?.href || "";
             const price =
-              card?.querySelector('span[data-testid="listing-price"]')?.innerText?.trim() || "N/A";
+              card.querySelector('span[data-testid="listing-price"]')?.innerText?.trim() || "N/A";
             const loc =
-              card?.querySelector('span[data-testid="listing-location"]')?.innerText?.trim() || "N/A";
+              card.querySelector('span[data-testid="listing-location"]')?.innerText?.trim() || "N/A";
             return { title, price, location: loc, link };
           })
         );
-      } catch {
-        listings = [];
+
+        listings.push(...pageListings);
+
+        if (listings.length >= limit) {
+          listings = listings.slice(0, limit);
+          break;
+        }
+
+        const nextButton = await page.$('a[aria-label="หน้าถัดไป"]');
+        if (nextButton) {
+          await Promise.all([
+            page.waitForNavigation({ waitUntil: "domcontentloaded" }),
+            nextButton.click(),
+          ]);
+        } else {
+          break;
+        }
       }
     }
 
@@ -49,12 +68,16 @@ export default async function handler(req, res) {
     // Source: FazWaz
     // -------------------------------
     if (source === "fazwaz") {
-      url = `https://www.fazwaz.com/condo-for-sale/thailand?bedrooms=${bedrooms}&max_price=${budget_max}&q=${encodeURIComponent(location)}`;
+      let url = `https://www.fazwaz.com/condo-for-sale/thailand?bedrooms=${bedrooms}&max_price=${budget_max}&q=${encodeURIComponent(
+        location
+      )}`;
       await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
 
-      try {
-        listings = await page.$$eval(".property-card", (nodes) =>
-          nodes.slice(0, 5).map((node) => {
+      while (listings.length < limit) {
+        await page.waitForSelector(".property-card", { timeout: 10000 }).catch(() => null);
+
+        const pageListings = await page.$$eval(".property-card", (nodes) =>
+          nodes.map((node) => {
             const title =
               node.querySelector(".property-card__title")?.innerText?.trim() || "No title";
             const price =
@@ -65,21 +88,40 @@ export default async function handler(req, res) {
             return { title, price, location: loc, link };
           })
         );
-      } catch {
-        listings = [];
+
+        listings.push(...pageListings);
+
+        if (listings.length >= limit) {
+          listings = listings.slice(0, limit);
+          break;
+        }
+
+        const nextButton = await page.$('a[rel="next"]');
+        if (nextButton) {
+          await Promise.all([
+            page.waitForNavigation({ waitUntil: "domcontentloaded" }),
+            nextButton.click(),
+          ]);
+        } else {
+          break;
+        }
       }
     }
 
     // -------------------------------
-    // Source: Hipflat (เพิ่มเป็นตัวอย่าง)
+    // Source: Hipflat
     // -------------------------------
     if (source === "hipflat") {
-      url = `https://www.hipflat.co.th/th/search?type=sale&property_type=condo&bedrooms=${bedrooms}&max_price=${budget_max}&q=${encodeURIComponent(location)}`;
+      let url = `https://www.hipflat.co.th/th/search?type=sale&property_type=condo&bedrooms=${bedrooms}&max_price=${budget_max}&q=${encodeURIComponent(
+        location
+      )}`;
       await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
 
-      try {
-        listings = await page.$$eval(".listing-item", (nodes) =>
-          nodes.slice(0, 5).map((node) => {
+      while (listings.length < limit) {
+        await page.waitForSelector(".listing-item", { timeout: 10000 }).catch(() => null);
+
+        const pageListings = await page.$$eval(".listing-item", (nodes) =>
+          nodes.map((node) => {
             const title =
               node.querySelector(".listing-title")?.innerText?.trim() || "No title";
             const price =
@@ -90,13 +132,32 @@ export default async function handler(req, res) {
             return { title, price, location: loc, link };
           })
         );
-      } catch {
-        listings = [];
+
+        listings.push(...pageListings);
+
+        if (listings.length >= limit) {
+          listings = listings.slice(0, limit);
+          break;
+        }
+
+        const nextButton = await page.$('a[rel="next"]');
+        if (nextButton) {
+          await Promise.all([
+            page.waitForNavigation({ waitUntil: "domcontentloaded" }),
+            nextButton.click(),
+          ]);
+        } else {
+          break;
+        }
       }
     }
 
     await browser.close();
-    return res.status(200).json({ source, listings });
+    return res.status(200).json({
+      source,
+      total: listings.length,
+      listings,
+    });
   } catch (err) {
     if (browser) await browser.close();
     console.error("Scraper error:", err);
